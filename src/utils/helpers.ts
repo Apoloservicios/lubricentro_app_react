@@ -1,4 +1,4 @@
-// src/utils/helpers.ts
+// src/utils/helpers.ts - Corregido
 import moment from 'moment';
 
 // Función para formatear la fecha
@@ -34,8 +34,8 @@ export const calculateNextChangeDate = (date: Date, intervalMonths: number): Dat
   return moment(date).add(intervalMonths, 'months').toDate();
 };
 
-// Función para calcular el próximo kilometraje
-export const calculateNextKm = (currentKm: number, interval: number): number => {
+// Función para calcular el próximo kilometraje - CORREGIDA para usar 10000 por defecto
+export const calculateNextKm = (currentKm: number, interval: number = 10000): number => {
   return currentKm + interval;
 };
 

@@ -1,4 +1,4 @@
-// src/services/cambiosService.ts
+// src/services/cambiosService.ts - Corregido
 import { db } from '../config/firebase';
 import { 
   collection, 
@@ -15,7 +15,7 @@ import {
   serverTimestamp,
   Timestamp 
 } from 'firebase/firestore';
-import { CambioAceite, User, Lubricentro } from '../interfaces';
+import { CambioAceite, CambioAceiteFormValues, User, Lubricentro } from '../interfaces';
 
 // Constantes
 const CAMBIOS_COLLECTION = 'cambiosAceite';
@@ -72,13 +72,13 @@ export const getLastCambioNumber = async (lubricentroId: string): Promise<string
 
 // Función para obtener todos los cambios de un lubricentro
 export const getCambios = async (lubricentroId: string, limitCount = 20): Promise<CambioAceite[]> => {
-    try {
-      const q = query(
-        collection(db, CAMBIOS_COLLECTION),
-        where('lubricentroId', '==', lubricentroId),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount) // Usa un nombre diferente para el parámetro
-      );
+  try {
+    const q = query(
+      collection(db, CAMBIOS_COLLECTION),
+      where('lubricentroId', '==', lubricentroId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
     
     const querySnapshot = await getDocs(q);
     
@@ -193,25 +193,34 @@ export const getCambioById = async (cambioId: string): Promise<CambioAceite | nu
   }
 };
 
-// Función para crear un cambio
+// Función para crear un cambio - CORREGIDA
 export const createCambio = async (
-  data: Omit<CambioAceite, 'id' | 'createdAt'>,
+  formData: CambioAceiteFormValues & {
+    nroCambio: string;
+    lubricentroId: string;
+    lubricentroNombre: string;
+    operatorId: string;
+    nombreOperario: string;
+  },
   currentUser: User,
   lubricentro: Lubricentro
 ): Promise<string> => {
   try {
-    // Preparar el objeto a guardar
+    // Preparar el objeto a guardar - asegurándonos de que todas las fechas estén presentes
     const cambioToSave = {
-      ...data,
+      // Campos del formulario
+      ...formData,
+      // Campos adicionales requeridos
       lubricentroId: lubricentro.id,
       lubricentroNombre: lubricentro.fantasyName,
       operatorId: currentUser.id,
       nombreOperario: `${currentUser.nombre} ${currentUser.apellido}`,
+      // Timestamp de creación
       createdAt: serverTimestamp(),
-      // Convertir fechas a Timestamp
-      fecha: Timestamp.fromDate(data.fecha),
-      fechaServicio: Timestamp.fromDate(data.fechaServicio),
-      fechaProximoCambio: Timestamp.fromDate(data.fechaProximoCambio),
+      // Convertir fechas a Timestamp - asegurándonos de que existan
+      fecha: formData.fecha ? Timestamp.fromDate(formData.fecha) : Timestamp.fromDate(new Date()),
+      fechaServicio: formData.fechaServicio ? Timestamp.fromDate(formData.fechaServicio) : Timestamp.fromDate(new Date()),
+      fechaProximoCambio: formData.fechaProximoCambio ? Timestamp.fromDate(formData.fechaProximoCambio) : Timestamp.fromDate(new Date()),
     };
     
     // Agregar el documento a Firestore
@@ -224,10 +233,10 @@ export const createCambio = async (
   }
 };
 
-// Función para actualizar un cambio
+// Función para actualizar un cambio - CORREGIDA
 export const updateCambio = async (
   cambioId: string,
-  data: Partial<Omit<CambioAceite, 'id' | 'createdAt' | 'lubricentroId' | 'lubricentroNombre' | 'operatorId' | 'nombreOperario' | 'nroCambio'>>
+  data: CambioAceiteFormValues
 ): Promise<void> => {
   try {
     const docRef = doc(db, CAMBIOS_COLLECTION, cambioId);

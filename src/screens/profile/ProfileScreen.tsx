@@ -1,4 +1,4 @@
-// src/screens/profile/ProfileScreen.tsx
+// src/screens/profile/ProfileScreen.tsx - CORRECCIÓN COMPLETA
 import React from 'react';
 import { View, StyleSheet, ScrollView, Image, Alert, Linking } from 'react-native';
 import { 
@@ -60,15 +60,28 @@ const ProfileScreen: React.FC = () => {
     return null;
   }
   
-  // Verificar si el periodo de prueba está activo
+  // CORREGIDO: Verificar estado del lubricentro con valores en español e inglés
   const isTrial = lubricentro.estado === 'trial';
   const trialDaysLeft = isTrial ? 
     moment(lubricentro.trialEndDate).diff(moment(), 'days') : 0;
   
-  // Determinar estado de activación
+  // Determinar estado de activación - CORREGIDO para incluir ambos idiomas
   const isActive = lubricentro.estado === 'active' || 
+                   lubricentro.estado === 'activo' ||  // AGREGADO: estado en español
     (isTrial && trialDaysLeft > 0);
-  
+
+  // Debug logging - AMPLIADO
+  console.log('Lubricentro estado:', lubricentro.estado);
+  console.log('Es trial:', isTrial);
+  console.log('Días de trial restantes:', trialDaysLeft);
+  console.log('Es activo:', isActive);
+  console.log('Estado comparaciones:', {
+    esActive: lubricentro.estado === 'active',
+    esActivo: lubricentro.estado === 'activo',
+    esTrial: lubricentro.estado === 'trial',
+    trialActivo: isTrial && trialDaysLeft > 0
+  });
+
   return (
     <ScrollView style={styles.container}>
       {/* Sección de Perfil de Usuario */}
@@ -150,14 +163,16 @@ const ProfileScreen: React.FC = () => {
           
           <Divider style={styles.divider} />
           
+          {/* CORREGIDO: Estado del lubricentro con mejor información */}
           <View style={styles.statusContainer}>
-            <Text style={styles.statusLabel}>Estado:</Text>
+            <Text style={styles.statusLabel}>Estado del Lubricentro:</Text>
             <View style={styles.statusContent}>
               <Text style={[
                 styles.statusValue, 
                 isActive ? styles.statusActive : styles.statusInactive
               ]}>
                 {isActive ? 'Activo' : 'Inactivo'}
+                {isTrial && ` (Trial - ${trialDaysLeft} días restantes)`}
               </Text>
               {isActive ? (
                 <Ionicons name="checkmark-circle" size={20} color={colors.success} />
@@ -165,6 +180,10 @@ const ProfileScreen: React.FC = () => {
                 <Ionicons name="close-circle" size={20} color={colors.error} />
               )}
             </View>
+            {/* AGREGADO: Mostrar estado técnico para debug */}
+            <Text style={styles.debugText}>
+              Estado técnico: {lubricentro.estado}
+            </Text>
           </View>
           
           {isTrial && (
@@ -311,15 +330,14 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
     marginBottom: 8,
   },
   statusLabel: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text,
-    marginRight: 8,
+    marginBottom: 8,
   },
   statusContent: {
     flexDirection: 'row',
@@ -334,6 +352,13 @@ const styles = StyleSheet.create({
   },
   statusInactive: {
     color: colors.error,
+  },
+  // AGREGADO: Estilo para texto de debug
+  debugText: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   trialContainer: {
     flexDirection: 'row',

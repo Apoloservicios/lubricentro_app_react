@@ -275,7 +275,7 @@ const HomeScreen: React.FC = () => {
           onChangeText={setSearchQuery}
           value={searchQuery}
           onSubmitEditing={handleSearch}
-          icon="search"
+          icon="magnify"
           style={styles.searchbar}
         />
         <IconButton

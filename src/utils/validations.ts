@@ -1,16 +1,6 @@
-// src/utils/validations.ts
+// src/utils/validations.ts - CORRECCIÓN
 import * as Yup from 'yup';
 import { isValidPhoneNumber, isValidDominio } from './helpers';
-
-// Esquema de validación para el formulario de login
-export const loginSchema = Yup.object().shape({
-  email: Yup.string()
-    .email('Email inválido')
-    .required('El email es requerido'),
-  password: Yup.string()
-    .min(6, 'La contraseña debe tener al menos 6 caracteres')
-    .required('La contraseña es requerida'),
-});
 
 // Esquema de validación para el formulario de cambio de aceite
 export const cambioAceiteSchema = Yup.object().shape({
@@ -85,77 +75,77 @@ export const cambioAceiteSchema = Yup.object().shape({
   cantidadAceite: Yup.string()
     .required('La cantidad de aceite es requerida'),
   
-  // Servicios realizados (notas obligatorias solo si el servicio fue realizado)
+  // Servicios realizados - CORREGIDOS
   filtroAceite: Yup.boolean(),
   filtroAceiteNota: Yup.string()
     .when('filtroAceite', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   filtroAire: Yup.boolean(),
   filtroAireNota: Yup.string()
     .when('filtroAire', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   filtroCombustible: Yup.boolean(),
   filtroCombustibleNota: Yup.string()
     .when('filtroCombustible', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   filtroHabitaculo: Yup.boolean(),
   filtroHabitaculoNota: Yup.string()
     .when('filtroHabitaculo', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   aditivo: Yup.boolean(),
   aditivoNota: Yup.string()
     .when('aditivo', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   engrase: Yup.boolean(),
   engraseNota: Yup.string()
     .when('engrase', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   refrigerante: Yup.boolean(),
   refrigeranteNota: Yup.string()
     .when('refrigerante', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   caja: Yup.boolean(),
   cajaNota: Yup.string()
     .when('caja', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   diferencial: Yup.boolean(),
   diferencialNota: Yup.string()
     .when('diferencial', {
       is: true,
-      then: Yup.string().required('Nota requerida cuando el servicio es realizado'),
-      otherwise: Yup.string()
+      then: (schema) => schema.required('Nota requerida cuando el servicio es realizado'),
+      otherwise: (schema) => schema
     }),
   
   // Observaciones (opcional)

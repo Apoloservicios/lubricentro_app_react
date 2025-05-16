@@ -142,7 +142,7 @@ const MainTabNavigator = () => (
         let iconName: any;
 
         if (route.name === 'HomeStack') {
-          iconName = focused ? 'oil' : 'oil-outline';
+          iconName = focused ? 'water' : 'water-outline';
         } else if (route.name === 'ProfileStack') {
           iconName = focused ? 'person' : 'person-outline';
         }
