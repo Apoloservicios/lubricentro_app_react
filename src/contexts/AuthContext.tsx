@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx
+// src/contexts/AuthContext.tsx (Versión corregida)
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { auth, db } from '../config/firebase';
 import { User, Lubricentro, AuthState } from '../interfaces';
@@ -8,12 +8,12 @@ import {
   onAuthStateChanged,
   User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs,Timestamp  } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp  } from 'firebase/firestore';
 import { Alert } from 'react-native';
 
 interface AuthContextProps {
   authState: AuthState;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string, onError?: (errorType: string) => void) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -38,13 +38,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   });
 
   // Función para obtener los datos del usuario desde Firestore
-  const fetchUserData = async (firebaseUser: FirebaseUser): Promise<{ user: User | null, lubricentro: Lubricentro | null }> => {
+  const fetchUserData = async (firebaseUser: FirebaseUser): Promise<{ user: User | null, lubricentro: Lubricentro | null, error?: string }> => {
     try {
+      console.log('Fetching user data for:', firebaseUser.uid);
+      
       // Obtener datos del usuario
       const userDoc = await getDoc(doc(db, 'usuarios', firebaseUser.uid));
       
       if (!userDoc.exists()) {
-        throw new Error('Usuario no encontrado');
+        console.error('Usuario no encontrado en Firestore');
+        return { user: null, lubricentro: null, error: 'Usuario no encontrado en la base de datos' };
       }
       
       const userData = userDoc.data() as Omit<User, 'id'>;
@@ -56,16 +59,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         updatedAt: userData.updatedAt ? (userData.updatedAt as unknown as Timestamp).toDate() : new Date(),
         lastLogin: userData.lastLogin ? (userData.lastLogin as unknown as Timestamp).toDate() : new Date(),
       };
+      
+      console.log('User data:', user);
+      
       // Verificar estado del usuario
       if (user.estado !== 'activo') {
-        throw new Error('Usuario inactivo. Contacte a soporte.');
+        console.warn('Usuario inactivo:', user.estado);
+        return { user: null, lubricentro: null, error: 'Usuario inactivo. Contacte a soporte.' };
       }
       
       // Obtener datos del lubricentro
+      console.log('Fetching lubricentro:', user.lubricentroId);
       const lubricentroDoc = await getDoc(doc(db, 'lubricentros', user.lubricentroId));
       
       if (!lubricentroDoc.exists()) {
-        throw new Error('Lubricentro no encontrado');
+        console.error('Lubricentro no encontrado:', user.lubricentroId);
+        return { user, lubricentro: null, error: 'Lubricentro no encontrado' };
       }
       
       const lubricentroData = lubricentroDoc.data() as Omit<Lubricentro, 'id'>;
@@ -77,20 +86,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         trialEndDate: lubricentroData.trialEndDate ? (lubricentroData.trialEndDate as unknown as Timestamp).toDate() : new Date(),
       };
       
-      // Verificar estado del lubricentro
-      if (lubricentro.estado !== 'active' && lubricentro.estado !== 'trial') {
-        throw new Error('Lubricentro inactivo. Contacte a soporte.');
+      console.log('Lubricentro data:', lubricentro);
+      console.log('Lubricentro estado:', lubricentro.estado);
+      
+      // Verificar estado del lubricentro - Corregir lógica
+      if (lubricentro.estado === 'inactive' || lubricentro.estado === 'suspended') {
+        console.warn('Lubricentro inactivo:', lubricentro.estado);
+        return { user, lubricentro: null, error: 'Su lubricentro se encuentra desactivado. Por favor contacte a info@hisma.com.ar para más información.' };
       }
       
-      // Verificar fecha de trial
-      if (lubricentro.estado === 'trial' && new Date() > lubricentro.trialEndDate) {
-        throw new Error('Período de prueba finalizado. Contacte a soporte.');
+      // Verificar fecha de trial - Solo si está en trial
+      if (lubricentro.estado === 'trial') {
+        const trialEndDate = lubricentro.trialEndDate || new Date();
+        if (new Date() > trialEndDate) {
+          console.warn('Período de prueba finalizado:', trialEndDate);
+          return { user, lubricentro: null, error: 'El período de prueba ha finalizado. Contacte a info@hisma.com.ar para activar su cuenta.' };
+        }
       }
       
+      console.log('Authentication successful');
       return { user, lubricentro };
     } catch (error: any) {
-      console.error('Error fetching user data:', error.message);
-      return { user: null, lubricentro: null };
+      console.error('Error fetching user data:', error);
+      return { user: null, lubricentro: null, error: `Error al cargar datos: ${error.message}` };
     }
   };
 
@@ -99,7 +117,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const { user, lubricentro } = await fetchUserData(firebaseUser);
+          const { user, lubricentro, error } = await fetchUserData(firebaseUser);
           
           if (user && lubricentro) {
             setAuthState({
@@ -115,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               user: null,
               lubricentro: null,
               isLoading: false,
-              error: 'No se pudo cargar los datos del usuario',
+              error: error || 'No se pudo cargar los datos',
             });
           }
         } catch (error: any) {
@@ -125,7 +143,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             user: null,
             lubricentro: null,
             isLoading: false,
-            error: error.message,
+            error: 'Error de autenticación',
           });
         }
       } else {
@@ -143,20 +161,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Función de inicio de sesión
-  const login = async (email: string, password: string): Promise<boolean> => {
+  // Función de inicio de sesión mejorada
+  const login = async (email: string, password: string, onError?: (errorType: string) => void): Promise<boolean> => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+      
+      console.log('Attempting login for:', email);
       
       // Intentar inicio de sesión con Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
-      // Obtener datos adicionales del usuario y lubricentro
-      const { user, lubricentro } = await fetchUserData(firebaseUser);
+      console.log('Firebase Auth successful, fetching user data...');
       
-      if (!user || !lubricentro) {
-        throw new Error('No se pudo cargar los datos del usuario');
+      // Obtener datos adicionales del usuario y lubricentro
+      const { user, lubricentro, error } = await fetchUserData(firebaseUser);
+      
+      if (!user) {
+        throw new Error(error || 'No se pudo cargar los datos del usuario');
+      }
+      
+      if (!lubricentro) {
+        throw new Error(error || 'No se pudo cargar los datos del lubricentro');
       }
       
       setAuthState({
@@ -168,14 +194,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       return true;
     } catch (error: any) {
-      console.error('Error en login:', error.message);
+      console.error('Error en login:', error);
       
       let errorMessage = 'Error al iniciar sesión';
+      let errorTitle = 'Error de autenticación';
+      let errorType = 'error_general';
       
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        errorMessage = 'Correo electrónico o contraseña incorrectos';
+      // Errores de Firebase Auth
+      if (error.code === 'auth/user-not-found') {
+        errorTitle = 'Usuario no encontrado';
+        errorMessage = 'No existe una cuenta con este correo electrónico.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorTitle = 'Contraseña incorrecta';
+        errorMessage = 'La contraseña ingresada es incorrecta.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorTitle = 'Email inválido';
+        errorMessage = 'El formato del correo electrónico no es válido.';
       } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Demasiados intentos fallidos. Intente más tarde';
+        errorTitle = 'Demasiados intentos';
+        errorMessage = 'Se han realizado demasiados intentos fallidos. Intente más tarde.';
+      } 
+      // Errores personalizados
+      else if (error.message?.includes('Usuario inactivo')) {
+        errorTitle = 'Usuario deshabilitado';
+        errorMessage = 'Su cuenta de usuario ha sido desactivada. Por favor, contacte a info@hisma.com.ar para más información.';
+        errorType = 'usuario_inactivo';
+      } else if (error.message?.includes('lubricentro se encuentra desactivado')) {
+        errorTitle = 'Lubricentro desactivado';
+        errorMessage = error.message;
+        errorType = 'lubricentro_inactivo';
+      } else if (error.message?.includes('período de prueba ha finalizado')) {
+        errorTitle = 'Período de prueba finalizado';
+        errorMessage = error.message;
+        errorType = 'periodo_prueba_finalizado';
+      } else if (error.message?.includes('Lubricentro no encontrado')) {
+        errorTitle = 'Error de configuración';
+        errorMessage = 'No se pudo encontrar la información del lubricentro. Contacte a info@hisma.com.ar para obtener ayuda.';
+        errorType = 'lubricentro_no_encontrado';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -186,7 +241,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         error: errorMessage,
       }));
       
-      Alert.alert('Error de autenticación', errorMessage);
+      // Mostrar alerta con mensaje detallado
+      Alert.alert(
+        errorTitle, 
+        errorMessage,
+        [
+          {
+            text: 'OK',
+            style: 'default',
+          }
+        ]
+      );
+      
+      // Llamar al callback si existe
+      if (onError) {
+        onError(errorType);
+      }
+      
       return false;
     }
   };
@@ -218,7 +289,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
-      const { user, lubricentro } = await fetchUserData(auth.currentUser);
+      const { user, lubricentro, error } = await fetchUserData(auth.currentUser);
       
       if (user && lubricentro) {
         setAuthState({
@@ -234,7 +305,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           user: null,
           lubricentro: null,
           isLoading: false,
-          error: 'No se pudo cargar los datos del usuario',
+          error: error || 'No se pudo cargar los datos',
         });
       }
     } catch (error: any) {
