@@ -1,4 +1,4 @@
-// src/screens/cambios/SearchCambioScreen.tsx
+// src/screens/cambios/SearchCambioScreen.tsx - Versión mejorada
 import React, { useState } from 'react';
 import { 
   View, 
@@ -42,14 +42,37 @@ const SearchCambioScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [menuVisible, setMenuVisible] = useState<{ [key: string]: boolean }>({});
   const [searched, setSearched] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Manejar la búsqueda
-  const handleSearch = async () => {
-    if (!searchQuery.trim() || !authState.lubricentro) return;
+  // Manejar cambio en el texto de búsqueda con debounce
+  const handleSearchQueryChange = (text: string) => {
+    setSearchQuery(text);
+    
+    // Cancelar el timeout anterior si existe
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+    
+    // Crear un nuevo timeout
+    if (text.trim()) {
+      const timeout = setTimeout(() => {
+        performSearch(text.trim());
+      }, 500); // 500ms de espera para realizar la búsqueda
+      
+      setTypingTimeout(timeout as NodeJS.Timeout);
+    } else {
+      setCambios([]);
+      setSearched(false);
+    }
+  };
+  
+  // Función para realizar la búsqueda
+  const performSearch = async (query: string) => {
+    if (!query || !authState.lubricentro) return;
     
     try {
       setLoading(true);
-      const results = await searchCambios(authState.lubricentro.id, searchQuery.trim());
+      const results = await searchCambios(authState.lubricentro.id, query);
       setCambios(results);
       setSearched(true);
     } catch (error) {
@@ -216,10 +239,10 @@ const SearchCambioScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.searchContainer}>
         <Searchbar
           placeholder="Buscar por dominio o cliente"
-          onChangeText={setSearchQuery}
+          onChangeText={handleSearchQueryChange}
           value={searchQuery}
-          onSubmitEditing={handleSearch}
           style={styles.searchbar}
+          autoFocus={true}
         />
         <IconButton
           icon="magnify"
@@ -227,7 +250,7 @@ const SearchCambioScreen: React.FC<Props> = ({ navigation }) => {
           containerColor={colors.primary}
           iconColor="white"
           size={24}
-          onPress={handleSearch}
+          onPress={() => performSearch(searchQuery.trim())}
           disabled={loading || !searchQuery.trim()}
           style={styles.searchButton}
         />

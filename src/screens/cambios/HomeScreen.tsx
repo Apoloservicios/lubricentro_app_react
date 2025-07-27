@@ -1,4 +1,4 @@
-// src/screens/cambios/HomeScreen.tsx
+// src/screens/cambios/HomeScreen.tsx - Con búsqueda en tiempo real
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
@@ -7,14 +7,14 @@ import {
   TouchableOpacity, 
   RefreshControl,
   Alert,
-  ActivityIndicator 
+  ActivityIndicator,
+  Text 
 } from 'react-native';
 import { 
-  Text, 
+  Searchbar, 
   Card, 
   Button, 
   FAB, 
-  Searchbar, 
   Chip,
   IconButton,
   Menu,
@@ -39,10 +39,12 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { authState } = useAuth();
   const [cambios, setCambios] = useState<CambioAceite[]>([]);
+  const [allCambios, setAllCambios] = useState<CambioAceite[]>([]); // Para guardar todos los cambios sin filtrar
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuVisible, setMenuVisible] = useState<{ [key: string]: boolean }>({});
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Cargar cambios de aceite
   const loadCambios = useCallback(async () => {
@@ -52,6 +54,7 @@ const HomeScreen: React.FC = () => {
       setLoading(true);
       const results = await getCambios(authState.lubricentro.id);
       setCambios(results);
+      setAllCambios(results); // Guardamos todos los cambios sin filtrar
     } catch (error) {
       console.error('Error al cargar cambios:', error);
       Alert.alert('Error', 'No se pudieron cargar los cambios de aceite');
@@ -65,6 +68,8 @@ const HomeScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       loadCambios();
+      // Limpiar búsqueda cuando se regresa a esta pantalla
+      setSearchQuery('');
     }, [loadCambios])
   );
 
@@ -72,13 +77,40 @@ const HomeScreen: React.FC = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     loadCambios();
+    setSearchQuery(''); // Limpiar búsqueda al refrescar
   };
 
-  // Manejar búsqueda
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      navigation.navigate('SearchCambio');
+  // Manejar búsqueda en tiempo real
+  const handleSearchQueryChange = (text: string) => {
+    setSearchQuery(text);
+    
+    // Cancelar timeout anterior si existe
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
     }
+    
+    // Filtrar los cambios localmente
+    const timeout = setTimeout(() => {
+      if (text.trim() === '') {
+        // Si no hay texto de búsqueda, mostrar todos los cambios
+        setCambios(allCambios);
+      } else {
+        // Filtrar por dominio o nombre de cliente (no sensible a mayúsculas/minúsculas)
+        const lowerText = text.toLowerCase().trim();
+        const filteredCambios = allCambios.filter(cambio => 
+          cambio.dominioVehiculo.toLowerCase().includes(lowerText) ||
+          cambio.nombreCliente.toLowerCase().includes(lowerText)
+        );
+        setCambios(filteredCambios);
+      }
+    }, 300); // 300ms es un buen balance para respuesta rápida sin sobrecargar
+    
+    setTypingTimeout(timeout as NodeJS.Timeout);
+  };
+
+  // Manejar búsqueda avanzada (para ir a la pantalla de búsqueda)
+  const handleAdvancedSearch = () => {
+    navigation.navigate('SearchCambio');
   };
 
   // Manejar eliminar cambio
@@ -97,7 +129,11 @@ const HomeScreen: React.FC = () => {
           onPress: async () => {
             try {
               await deleteCambio(cambioId);
-              setCambios(cambios.filter(cambio => cambio.id !== cambioId));
+              // Actualizar ambas listas: filtrada y completa
+              const updatedCambios = cambios.filter(cambio => cambio.id !== cambioId);
+              const updatedAllCambios = allCambios.filter(cambio => cambio.id !== cambioId);
+              setCambios(updatedCambios);
+              setAllCambios(updatedAllCambios);
               Alert.alert('Éxito', 'Cambio de aceite eliminado correctamente');
             } catch (error) {
               console.error('Error al eliminar cambio:', error);
@@ -241,8 +277,8 @@ const HomeScreen: React.FC = () => {
     );
   }
 
-  // Renderizar lista vacía
-  if (cambios.length === 0 && !loading) {
+  // Renderizar lista vacía (cuando no hay cambios en la base de datos)
+  if (allCambios.length === 0 && !loading) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="water" size={80} color={colors.primary} />
@@ -272,10 +308,8 @@ const HomeScreen: React.FC = () => {
       <View style={styles.searchContainer}>
         <Searchbar
           placeholder="Buscar por dominio o cliente"
-          onChangeText={setSearchQuery}
+          onChangeText={handleSearchQueryChange}
           value={searchQuery}
-          onSubmitEditing={handleSearch}
-          icon="magnify"
           style={styles.searchbar}
         />
         <IconButton
@@ -284,25 +318,36 @@ const HomeScreen: React.FC = () => {
           containerColor={colors.primary}
           iconColor="white"
           size={24}
-          onPress={() => navigation.navigate('SearchCambio')}
+          onPress={handleAdvancedSearch}
           style={styles.searchButton}
         />
       </View>
       
-      <FlatList
-        data={cambios}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[colors.primary]}
-          />
-        }
-      />
+      {/* Mostrar mensaje cuando no hay resultados en la búsqueda */}
+      {!loading && searchQuery.trim() !== '' && cambios.length === 0 ? (
+        <View style={styles.emptySearchContainer}>
+          <Ionicons name="search-outline" size={64} color={colors.textLight} />
+          <Text style={styles.emptyTitle}>No se encontraron resultados</Text>
+          <Text style={styles.emptyText}>
+            No se encontraron cambios para "{searchQuery}"
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={cambios}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+            />
+          }
+        />
+      )}
       
       <FAB
         style={styles.fab}
@@ -444,6 +489,12 @@ const styles = StyleSheet.create({
   addButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: 16,
+  },
+  emptySearchContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
   },
 });
 

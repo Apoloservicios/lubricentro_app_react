@@ -1,4 +1,4 @@
-// src/services/cambiosService.ts - Corregido
+// src/services/cambiosService.ts - CORREGIDO PARA INCLUIR INFORMACIÓN COMPLETA DEL LUBRICENTRO
 import { db } from '../config/firebase';
 import { 
   collection, 
@@ -70,7 +70,54 @@ export const getLastCambioNumber = async (lubricentroId: string): Promise<string
   }
 };
 
-// Función para obtener todos los cambios de un lubricentro
+// Función auxiliar para obtener información del lubricentro
+const getLubricentroInfo = async (lubricentroId: string) => {
+  try {
+    const lubricentroDoc = await getDoc(doc(db, 'lubricentros', lubricentroId));
+    
+    if (!lubricentroDoc.exists()) {
+      return null;
+    }
+    
+    const lubricentroData = lubricentroDoc.data() as Lubricentro;
+    
+    // Retornar solo la información necesaria para el PDF
+    return {
+      fantasyName: lubricentroData.fantasyName,
+      razonSocial: lubricentroData.razonSocial,
+      cuit: lubricentroData.cuit,
+      responsable: lubricentroData.responsable,
+      domicilio: lubricentroData.domicilio,
+      email: lubricentroData.email,
+      phone: lubricentroData.phone,
+      logoUrl: lubricentroData.logoUrl,
+    };
+  } catch (error) {
+    console.error('Error al obtener información del lubricentro:', error);
+    return null;
+  }
+};
+
+// Función para convertir datos de Firestore a CambioAceite - ACTUALIZADA
+const convertFirestoreDataToCambio = async (doc: any): Promise<CambioAceite> => {
+  const data = doc.data();
+  
+  // Obtener información completa del lubricentro
+  const lubricentroInfo = await getLubricentroInfo(data.lubricentroId);
+  
+  return {
+    id: doc.id,
+    ...data,
+    fecha: data.fecha?.toDate(),
+    fechaServicio: data.fechaServicio?.toDate(),
+    fechaProximoCambio: data.fechaProximoCambio?.toDate(),
+    createdAt: data.createdAt?.toDate(),
+    // NUEVO: Incluir información completa del lubricentro
+    lubricentro: lubricentroInfo,
+  } as CambioAceite;
+};
+
+// Función para obtener todos los cambios de un lubricentro - ACTUALIZADA
 export const getCambios = async (lubricentroId: string, limitCount = 20): Promise<CambioAceite[]> => {
   try {
     const q = query(
@@ -82,24 +129,17 @@ export const getCambios = async (lubricentroId: string, limitCount = 20): Promis
     
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        fecha: data.fecha?.toDate(),
-        fechaServicio: data.fechaServicio?.toDate(),
-        fechaProximoCambio: data.fechaProximoCambio?.toDate(),
-        createdAt: data.createdAt?.toDate(),
-      } as CambioAceite;
-    });
+    // Procesar todos los documentos y obtener información del lubricentro
+    const cambiosPromises = querySnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
+    
+    return await Promise.all(cambiosPromises);
   } catch (error) {
     console.error('Error al obtener cambios:', error);
     throw error;
   }
 };
 
-// Función para buscar cambios por dominio o cliente
+// Función para buscar cambios por dominio o cliente - ACTUALIZADA
 export const searchCambios = async (
   lubricentroId: string, 
   searchTerm: string
@@ -117,22 +157,11 @@ export const searchCambios = async (
     
     // Si encontramos por dominio, devolvemos esos resultados
     if (!dominioSnapshot.empty) {
-      return dominioSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          fecha: data.fecha?.toDate(),
-          fechaServicio: data.fechaServicio?.toDate(),
-          fechaProximoCambio: data.fechaProximoCambio?.toDate(),
-          createdAt: data.createdAt?.toDate(),
-        } as CambioAceite;
-      });
+      const cambiosPromises = dominioSnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
+      return await Promise.all(cambiosPromises);
     }
     
     // Si no encontramos por dominio, buscamos por nombre de cliente
-    // Firestore no soporta búsquedas parciales directamente, así que hacemos una búsqueda amplia
-    // y filtramos los resultados en el cliente
     const clienteQuery = query(
       collection(db, CAMBIOS_COLLECTION),
       where('lubricentroId', '==', lubricentroId),
@@ -145,29 +174,20 @@ export const searchCambios = async (
     // Filtrar resultados que contengan el término de búsqueda
     const searchTermLower = searchTerm.toLowerCase();
     
-    return clienteSnapshot.docs
-      .filter(doc => {
-        const data = doc.data();
-        return data.nombreCliente.toLowerCase().includes(searchTermLower);
-      })
-      .map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          fecha: data.fecha?.toDate(),
-          fechaServicio: data.fechaServicio?.toDate(),
-          fechaProximoCambio: data.fechaProximoCambio?.toDate(),
-          createdAt: data.createdAt?.toDate(),
-        } as CambioAceite;
-      });
+    const filteredDocs = clienteSnapshot.docs.filter(doc => {
+      const data = doc.data();
+      return data.nombreCliente.toLowerCase().includes(searchTermLower);
+    });
+    
+    const cambiosPromises = filteredDocs.map(doc => convertFirestoreDataToCambio(doc));
+    return await Promise.all(cambiosPromises);
   } catch (error) {
     console.error('Error al buscar cambios:', error);
     throw error;
   }
 };
 
-// Función para obtener un cambio por ID
+// Función para obtener un cambio por ID - ACTUALIZADA
 export const getCambioById = async (cambioId: string): Promise<CambioAceite | null> => {
   try {
     const docRef = doc(db, CAMBIOS_COLLECTION, cambioId);
@@ -177,23 +197,15 @@ export const getCambioById = async (cambioId: string): Promise<CambioAceite | nu
       return null;
     }
     
-    const data = docSnap.data();
-    
-    return {
-      id: docSnap.id,
-      ...data,
-      fecha: data.fecha?.toDate(),
-      fechaServicio: data.fechaServicio?.toDate(),
-      fechaProximoCambio: data.fechaProximoCambio?.toDate(),
-      createdAt: data.createdAt?.toDate(),
-    } as CambioAceite;
+    // Usar la función auxiliar para convertir datos y obtener info del lubricentro
+    return await convertFirestoreDataToCambio(docSnap);
   } catch (error) {
     console.error('Error al obtener cambio por ID:', error);
     throw error;
   }
 };
 
-// Función para crear un cambio - CORREGIDA
+// Función para crear un cambio - ACTUALIZADA para incluir información del lubricentro
 export const createCambio = async (
   formData: CambioAceiteFormValues & {
     nroCambio: string;
@@ -206,7 +218,7 @@ export const createCambio = async (
   lubricentro: Lubricentro
 ): Promise<string> => {
   try {
-    // Preparar el objeto a guardar - asegurándonos de que todas las fechas estén presentes
+    // Preparar el objeto a guardar
     const cambioToSave = {
       // Campos del formulario
       ...formData,
@@ -217,7 +229,7 @@ export const createCambio = async (
       nombreOperario: `${currentUser.nombre} ${currentUser.apellido}`,
       // Timestamp de creación
       createdAt: serverTimestamp(),
-      // Convertir fechas a Timestamp - asegurándonos de que existan
+      // Convertir fechas a Timestamp
       fecha: formData.fecha ? Timestamp.fromDate(formData.fecha) : Timestamp.fromDate(new Date()),
       fechaServicio: formData.fechaServicio ? Timestamp.fromDate(formData.fechaServicio) : Timestamp.fromDate(new Date()),
       fechaProximoCambio: formData.fechaProximoCambio ? Timestamp.fromDate(formData.fechaProximoCambio) : Timestamp.fromDate(new Date()),
@@ -233,7 +245,7 @@ export const createCambio = async (
   }
 };
 
-// Función para actualizar un cambio - CORREGIDA
+// Función para actualizar un cambio
 export const updateCambio = async (
   cambioId: string,
   data: CambioAceiteFormValues

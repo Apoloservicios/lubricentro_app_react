@@ -155,6 +155,7 @@ const CambioDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   };
   
   // Compartir mensaje por WhatsApp - MENSAJE MUY AMPLIADO
+// Compartir mensaje por WhatsApp - MENSAJE AMPLIADO CON INFORMACIÓN REAL DEL LUBRICENTRO
   const shareByWhatsApp = async () => {
     if (!cambio) return;
     
@@ -212,6 +213,20 @@ const CambioDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         ? `\n🛣️ *Kilómetros restantes:* Aproximadamente ${kmDiferencia.toLocaleString()} km hasta el próximo cambio`
         : '';
       
+      // CORREGIDO: Información real del lubricentro
+      const lubricentroContacto = cambio.lubricentro?.phone ? 
+        `📞 *Tel:* ${cambio.lubricentro.phone}` : 
+        `📞 *Tel:* Consultar`;
+      
+      const lubricentroDireccion = cambio.lubricentro?.domicilio ? 
+        `📍 *Dirección:* ${cambio.lubricentro.domicilio}\n` : '';
+      
+      const lubricentroEmail = cambio.lubricentro?.email ? 
+        ` | ✉️ ${cambio.lubricentro.email}` : '';
+      
+      const lubricentroCuit = cambio.lubricentro?.cuit ? 
+        `\n🏢 *CUIT:* ${cambio.lubricentro.cuit}` : '';
+
       const message = `🛠️ *COMPROBANTE DE CAMBIO DE ACEITE* 🛠️\n` +
         `📋 *N° ${cambio.nroCambio}*\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
@@ -242,7 +257,9 @@ const CambioDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👨‍🔧 *Atendido por:* ${cambio.nombreOperario}\n` +
         `🏪 *${cambio.lubricentroNombre}*\n` +
-        `📞 *¿Consultas? Contáctanos!*\n\n` +
+        lubricentroDireccion +
+        lubricentroContacto + lubricentroEmail +
+        lubricentroCuit + `\n\n` +
         `✅ *¡Gracias por confiar en nosotros!* 🤝\n` +
         `💚 *Su vehículo está en las mejores manos* 💚`;
       

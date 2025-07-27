@@ -14,17 +14,17 @@ type SupportScreenProps = {
 const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
   // Función para abrir email
   const openEmail = () => {
-    Linking.openURL('mailto:soporte@lubricentroapp.com?subject=Soporte%20Lubricentro%20App');
+    Linking.openURL('mailto:info@hisma.com.ar?subject=Soporte%20Hisma%20App');
   };
 
   // Función para abrir WhatsApp
   const openWhatsApp = () => {
-    Linking.openURL('https://wa.me/5491112345678?text=Necesito%20ayuda%20con%20Lubricentro%20App');
+    Linking.openURL('https://wa.me/5492604515854?text=Necesito%20ayuda%20con%20Hisma%20App');
   };
 
   // Función para llamar
   const openPhone = () => {
-    Linking.openURL('tel:+5491112345678');
+    Linking.openURL('tel:+5492604515854');
   };
 
   return (

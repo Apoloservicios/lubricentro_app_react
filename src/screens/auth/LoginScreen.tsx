@@ -72,7 +72,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.title}>Lubricentro App</Text>
+          
           <Text style={styles.subtitle}>Gestión de Cambios de Aceite</Text>
         </View>
         
