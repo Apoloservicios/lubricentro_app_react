@@ -108,10 +108,11 @@ const convertFirestoreDataToCambio = async (doc: any): Promise<CambioAceite> => 
   return {
     id: doc.id,
     ...data,
-    fecha: data.fecha?.toDate(),
-    fechaServicio: data.fechaServicio?.toDate(),
-    fechaProximoCambio: data.fechaProximoCambio?.toDate(),
-    createdAt: data.createdAt?.toDate(),
+    // CORREGIR: Verificar si existe antes de convertir
+    fecha: data.fecha?.toDate ? data.fecha.toDate() : new Date(),
+    fechaServicio: data.fechaServicio?.toDate ? data.fechaServicio.toDate() : new Date(),
+    fechaProximoCambio: data.fechaProximoCambio?.toDate ? data.fechaProximoCambio.toDate() : new Date(),
+    createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
     // NUEVO: Incluir información completa del lubricentro
     lubricentro: lubricentroInfo,
   } as CambioAceite;
