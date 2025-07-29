@@ -33,11 +33,11 @@ export const getLastCambioNumber = async (lubricentroId: string): Promise<string
     const lubricentro = lubricentroDoc.data() as Lubricentro;
     const prefix = lubricentro.ticketPrefix || 'LUB';
     
-    // Consultar el último cambio para ese lubricentro
+    // CORREGIR: Consultar TODOS los cambios, no solo los recientes
     const q = query(
       collection(db, CAMBIOS_COLLECTION),
       where('lubricentroId', '==', lubricentroId),
-      orderBy('createdAt', 'desc'),
+      orderBy('nroCambio', 'desc'), // CAMBIAR: ordenar por nroCambio, no por createdAt
       limit(1)
     );
     
@@ -52,7 +52,9 @@ export const getLastCambioNumber = async (lubricentroId: string): Promise<string
     const lastChange = querySnapshot.docs[0].data() as CambioAceite;
     const lastNumber = lastChange.nroCambio;
     
-    // Extraer el número y aumentarlo
+    console.log('Último número encontrado:', lastNumber);
+    
+    // MEJORAR: Extraer solo el número y aumentarlo
     const matches = lastNumber.match(/(\w+)-(\d+)/);
     
     if (!matches || matches.length < 3) {
@@ -63,7 +65,11 @@ export const getLastCambioNumber = async (lubricentroId: string): Promise<string
     const newNumber = lastNumberInt + 1;
     
     // Formatear el nuevo número con ceros a la izquierda
-    return `${prefix}-${newNumber.toString().padStart(5, '0')}`;
+    const newNumberFormatted = `${prefix}-${newNumber.toString().padStart(5, '0')}`;
+    
+    console.log('Nuevo número generado:', newNumberFormatted);
+    
+    return newNumberFormatted;
   } catch (error) {
     console.error('Error al obtener último número de cambio:', error);
     throw error;
@@ -113,9 +119,75 @@ const convertFirestoreDataToCambio = async (doc: any): Promise<CambioAceite> => 
     fechaServicio: data.fechaServicio?.toDate ? data.fechaServicio.toDate() : new Date(),
     fechaProximoCambio: data.fechaProximoCambio?.toDate ? data.fechaProximoCambio.toDate() : new Date(),
     createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
-    // NUEVO: Incluir información completa del lubricentro
+    
+    // NUEVO: Manejar estado - si no existe, asumir 'completo' para cambios antiguos
+    estado: data.estado || 'completo',
+    fechaCreacion: data.fechaCreacion?.toDate ? data.fechaCreacion.toDate() : data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+    fechaCompletado: data.fechaCompletado?.toDate ? data.fechaCompletado.toDate() : undefined,
+    usuarioCompletado: data.usuarioCompletado || data.operatorId,
+    
+    // Incluir información completa del lubricentro
     lubricentro: lubricentroInfo,
   } as CambioAceite;
+};
+
+  export const getCambiosPendientes = async (lubricentroId: string): Promise<CambioAceite[]> => {
+    try {
+      const q = query(
+        collection(db, CAMBIOS_COLLECTION),
+        where('lubricentroId', '==', lubricentroId),
+        where('estado', '==', 'pendiente'),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const cambiosPromises = querySnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
+      
+      return await Promise.all(cambiosPromises);
+    } catch (error) {
+      console.error('Error al obtener cambios pendientes:', error);
+      throw error;
+    }
+  };
+  // Función para completar un servicio pendiente
+export const completarServicio = async (
+  cambioId: string,
+  formData: CambioAceiteFormValues,
+  currentUser: User
+): Promise<void> => {
+  try {
+    const docRef = doc(db, CAMBIOS_COLLECTION, cambioId);
+    
+    const updateData: any = {
+      ...formData,
+      estado: 'completo',
+      fechaCompletado: serverTimestamp(),
+      usuarioCompletado: currentUser.id,
+      
+      // Convertir fechas a Timestamp
+      fechaServicio: formData.fechaServicio ? Timestamp.fromDate(formData.fechaServicio) : Timestamp.fromDate(new Date()),
+      fechaProximoCambio: formData.fechaProximoCambio ? Timestamp.fromDate(formData.fechaProximoCambio) : Timestamp.fromDate(new Date()),
+    };
+    
+    await updateDoc(docRef, updateData);
+  } catch (error) {
+    console.error('Error al completar servicio:', error);
+    throw error;
+  }
+};
+
+// Función para marcar como enviado
+export const marcarComoEnviado = async (cambioId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, CAMBIOS_COLLECTION, cambioId);
+    
+    await updateDoc(docRef, {
+      estado: 'enviado'
+    });
+  } catch (error) {
+    console.error('Error al marcar como enviado:', error);
+    throw error;
+  }
 };
 
 // Función para obtener todos los cambios de un lubricentro - ACTUALIZADA
@@ -219,22 +291,33 @@ export const createCambio = async (
   lubricentro: Lubricentro
 ): Promise<string> => {
   try {
-    // Preparar el objeto a guardar
+    // Preparar el objeto a guardar - COMPATIBLE CON SISTEMA WEB
     const cambioToSave = {
       // Campos del formulario
       ...formData,
-      // Campos adicionales requeridos
+      
+      // NUEVOS CAMPOS para compatibilidad con sistema web:
+      estado: 'completo', // Estado del cambio
+      fechaCreacion: serverTimestamp(), // Fecha de creación
+      fechaCompletado: serverTimestamp(), // Fecha de completado
+      usuarioCompletado: currentUser.id, // Usuario que completó
+      
+      // Campos existentes
       lubricentroId: lubricentro.id,
       lubricentroNombre: lubricentro.fantasyName,
       operatorId: currentUser.id,
       nombreOperario: `${currentUser.nombre} ${currentUser.apellido}`,
-      // Timestamp de creación
+      
+      // Timestamps
       createdAt: serverTimestamp(),
+      
       // Convertir fechas a Timestamp
       fecha: formData.fecha ? Timestamp.fromDate(formData.fecha) : Timestamp.fromDate(new Date()),
       fechaServicio: formData.fechaServicio ? Timestamp.fromDate(formData.fechaServicio) : Timestamp.fromDate(new Date()),
       fechaProximoCambio: formData.fechaProximoCambio ? Timestamp.fromDate(formData.fechaProximoCambio) : Timestamp.fromDate(new Date()),
     };
+    
+    console.log('Guardando cambio con datos:', cambioToSave);
     
     // Agregar el documento a Firestore
     const docRef = await addDoc(collection(db, CAMBIOS_COLLECTION), cambioToSave);

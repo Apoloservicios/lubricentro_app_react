@@ -9,6 +9,8 @@ export type UserStatus = 'activo' | 'inactivo' | 'suspendido';
 // Estado del lubricentro
 export type LubricentroStatus = 'active' | 'activo' | 'inactive' | 'trial' | 'suspended';
 
+export type CambioEstado = 'pendiente' | 'completo' | 'enviado';
+
 // Usuario
 export interface User {
   id: string;
@@ -98,6 +100,12 @@ export interface CambioAceite {
   // Información del lubricentro y operario
   lubricentroId: string;
   lubricentroNombre: string;
+
+  // NUEVO: Estado del cambio
+estado?: CambioEstado; // Opcional para cambios antiguos
+  fechaCreacion?: Date;
+  fechaCompletado?: Date;
+  usuarioCompletado?: string;
   
   // NUEVO: Información completa del lubricentro para PDF
   lubricentro?: {
@@ -156,6 +164,7 @@ export interface CambioAceiteFormValues {
   diferencial: boolean;
   diferencialNota: string;
   observaciones: string;
+    estado?: CambioEstado;
 }
 
 // Estado de autenticación (sin cambios)

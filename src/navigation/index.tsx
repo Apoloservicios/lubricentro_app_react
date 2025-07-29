@@ -16,6 +16,9 @@ import EditCambioScreen from '../screens/cambios/EditCambioScreen';
 import SearchCambioScreen from '../screens/cambios/SearchCambioScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
+import ServiciosPendientesScreen from '../screens/cambios/ServiciosPendientesScreen';
+import CompletarServicioScreen from '../screens/cambios/CompletarServicioScreen';
+
 // Hooks
 import useAuth from '../hooks/useAuth';
 
@@ -37,6 +40,8 @@ export type HomeStackParamList = {
   AddCambio: undefined;
   EditCambio: { cambio: CambioAceite };
   SearchCambio: undefined;
+  ServiciosPendientes: undefined;
+  CompletarServicio: { cambio: CambioAceite };
 };
 
 export type ProfileStackParamList = {
@@ -78,6 +83,7 @@ const AuthNavigator = () => (
   </AuthStack.Navigator>
 );
 
+
 // Home Stack Navigator
 const HomeStackNavigator = () => (
   <HomeStack.Navigator
@@ -112,6 +118,17 @@ const HomeStackNavigator = () => (
       name="SearchCambio" 
       component={SearchCambioScreen} 
       options={{ title: 'Buscar Cambio' }} 
+    />
+    {/* NUEVAS PANTALLAS */}
+    <HomeStack.Screen 
+      name="ServiciosPendientes" 
+      component={ServiciosPendientesScreen} 
+      options={{ title: 'Servicios Pendientes' }} 
+    />
+    <HomeStack.Screen 
+      name="CompletarServicio" 
+      component={CompletarServicioScreen} 
+      options={{ title: 'Completar Servicio' }} 
     />
   </HomeStack.Navigator>
 );

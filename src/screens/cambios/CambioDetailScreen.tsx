@@ -25,7 +25,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList } from '../../navigation';
 import { colors } from '../../styles/theme';
-import { getCambioById, deleteCambio } from '../../services/cambiosService';
+import { getCambioById, deleteCambio,marcarComoEnviado } from '../../services/cambiosService';
 import { CambioAceite } from '../../interfaces';
 import moment from 'moment';
 import 'moment/locale/es';
@@ -33,6 +33,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { generatePdfHtml } from '../../utils/pdfGenerator';
+
 
 moment.locale('es');
 
@@ -96,7 +97,42 @@ const CambioDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       ]
     );
   };
+
   
+  
+
+      // Agregar esta función en CambioDetailScreen:
+    const handleMarcarComoEnviado = async () => {
+      if (!cambio) return;
+      
+      Alert.alert(
+        'Marcar como Enviado',
+        '¿Confirma que el comprobante fue enviado al cliente?',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+          },
+          {
+            text: 'Confirmar',
+            onPress: async () => {
+              try {
+                await marcarComoEnviado(cambio.id);
+                Alert.alert('Éxito', 'Cambio marcado como enviado');
+                // Recargar los datos
+                const updatedCambio = await getCambioById(cambio.id);
+                if (updatedCambio) {
+                  setCambio(updatedCambio);
+                }
+              } catch (error) {
+                console.error('Error al marcar como enviado:', error);
+                Alert.alert('Error', 'No se pudo marcar como enviado');
+              }
+            },
+          },
+        ]
+      );
+    };
   // Generar y compartir PDF - CORREGIDO usando expo-print
   const generateAndSharePdf = async () => {
     if (!cambio) return;
@@ -374,6 +410,16 @@ const CambioDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               title="Compartir por WhatsApp"
               leadingIcon="whatsapp"
             />
+            {cambio.estado === 'completo' && (
+            <Menu.Item
+                onPress={() => {
+                  setMenuVisible(false);
+                  handleMarcarComoEnviado();
+                }}
+                title="Marcar como Enviado"
+                leadingIcon="send"
+              />
+            )}
           </Menu>
         </View>
         

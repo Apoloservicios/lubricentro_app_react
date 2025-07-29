@@ -35,6 +35,9 @@ moment.locale('es');
 
 type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'Home'>;
 
+
+
+
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { authState } = useAuth();
@@ -45,24 +48,29 @@ const HomeScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [menuVisible, setMenuVisible] = useState<{ [key: string]: boolean }>({});
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completo' | 'enviado'>('todos');
 
   // Cargar cambios de aceite
-  const loadCambios = useCallback(async () => {
-    if (!authState.lubricentro) return;
+const loadCambios = useCallback(async () => {
+  if (!authState.lubricentro) return;
+  
+  try {
+    setLoading(true);
+    const results = await getCambios(authState.lubricentro.id);
+    setCambios(results);
+    setAllCambios(results);
     
-    try {
-      setLoading(true);
-      const results = await getCambios(authState.lubricentro.id);
-      setCambios(results);
-      setAllCambios(results); // Guardamos todos los cambios sin filtrar
-    } catch (error) {
-      console.error('Error al cargar cambios:', error);
-      Alert.alert('Error', 'No se pudieron cargar los cambios de aceite');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [authState.lubricentro]);
+    // NUEVO: Resetear filtros al cargar
+    setFiltroEstado('todos');
+    setSearchQuery('');
+  } catch (error) {
+    console.error('Error al cargar cambios:', error);
+    Alert.alert('Error', 'No se pudieron cargar los cambios de aceite');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, [authState.lubricentro]);
 
   // Efecto para cargar cambios cuando la pantalla obtiene el foco
   useFocusEffect(
@@ -81,32 +89,84 @@ const HomeScreen: React.FC = () => {
   };
 
   // Manejar búsqueda en tiempo real
-  const handleSearchQueryChange = (text: string) => {
-    setSearchQuery(text);
+const handleSearchQueryChange = (text: string) => {
+  setSearchQuery(text);
+  
+  if (typingTimeout) {
+    clearTimeout(typingTimeout);
+  }
+  
+  const timeout = setTimeout(() => {
+    let filteredData = allCambios;
     
-    // Cancelar timeout anterior si existe
-    if (typingTimeout) {
-      clearTimeout(typingTimeout);
+    // PRIMERO: Aplicar filtro de texto si hay búsqueda
+    if (text.trim() !== '') {
+      const lowerText = text.toLowerCase().trim();
+      filteredData = filteredData.filter(cambio => 
+        cambio.dominioVehiculo.toLowerCase().includes(lowerText) ||
+        cambio.nombreCliente.toLowerCase().includes(lowerText)
+      );
     }
     
-    // Filtrar los cambios localmente
-    const timeout = setTimeout(() => {
-      if (text.trim() === '') {
-        // Si no hay texto de búsqueda, mostrar todos los cambios
-        setCambios(allCambios);
-      } else {
-        // Filtrar por dominio o nombre de cliente (no sensible a mayúsculas/minúsculas)
-        const lowerText = text.toLowerCase().trim();
-        const filteredCambios = allCambios.filter(cambio => 
-          cambio.dominioVehiculo.toLowerCase().includes(lowerText) ||
-          cambio.nombreCliente.toLowerCase().includes(lowerText)
-        );
-        setCambios(filteredCambios);
-      }
-    }, 300); // 300ms es un buen balance para respuesta rápida sin sobrecargar
+    // SEGUNDO: Aplicar filtro de estado
+    if (filtroEstado !== 'todos') {
+      filteredData = filteredData.filter(cambio => 
+        (cambio.estado || 'completo') === filtroEstado
+      );
+    }
     
-    setTypingTimeout(timeout as NodeJS.Timeout);
-  };
+    setCambios(filteredData);
+  }, 300);
+  
+  setTypingTimeout(timeout as NodeJS.Timeout);
+};
+
+useEffect(() => {
+  const pendientesCount = allCambios.filter(c => (c.estado || 'completo') === 'pendiente').length;
+  
+  navigation.setOptions({
+    headerRight: () => (
+      pendientesCount > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ color: 'white', marginRight: 8, fontSize: 12 }}>
+            {pendientesCount}
+          </Text>
+          <IconButton
+            icon="clock-outline"
+            iconColor="white"
+            size={24}
+            onPress={() => navigation.navigate('ServiciosPendientes')}
+          />
+        </View>
+      ) : null
+    ),
+  });
+}, [allCambios, navigation]);
+
+// NUEVA FUNCIÓN: Manejar cambio de filtro de estado
+const handleFiltroEstadoChange = (nuevoFiltro: 'todos' | 'pendiente' | 'completo' | 'enviado') => {
+  setFiltroEstado(nuevoFiltro);
+  
+  let filteredData = allCambios;
+  
+  // Aplicar filtro de texto si hay búsqueda activa
+  if (searchQuery.trim() !== '') {
+    const lowerText = searchQuery.toLowerCase().trim();
+    filteredData = filteredData.filter(cambio => 
+      cambio.dominioVehiculo.toLowerCase().includes(lowerText) ||
+      cambio.nombreCliente.toLowerCase().includes(lowerText)
+    );
+  }
+  
+  // Aplicar filtro de estado
+  if (nuevoFiltro !== 'todos') {
+    filteredData = filteredData.filter(cambio => 
+      (cambio.estado || 'completo') === nuevoFiltro
+    );
+  }
+  
+  setCambios(filteredData);
+};
 
   // Manejar búsqueda avanzada (para ir a la pantalla de búsqueda)
   const handleAdvancedSearch = () => {
@@ -144,6 +204,8 @@ const HomeScreen: React.FC = () => {
       ]
     );
   };
+
+  
 
   // Función para renderizar cada elemento de la lista
   const renderItem = ({ item }: { item: CambioAceite }) => {
@@ -261,6 +323,26 @@ const HomeScreen: React.FC = () => {
             >
               Próximo: {proximoCambio}
             </Chip>
+            {item.estado && (
+              <Chip 
+                style={[
+                  styles.chipEstado,
+                  item.estado === 'pendiente' && styles.chipPendiente,
+                  item.estado === 'completo' && styles.chipCompleto,
+                  item.estado === 'enviado' && styles.chipEnviado,
+                ]}
+                textStyle={styles.chipText}
+                icon={
+                  item.estado === 'pendiente' ? 'clock-outline' :
+                  item.estado === 'completo' ? 'check-circle' :
+                  'send'
+                }
+              >
+                {item.estado === 'pendiente' ? 'Pendiente' :
+                item.estado === 'completo' ? 'Completo' :
+                'Enviado'}
+              </Chip>
+            )}
           </View>
         </Card.Content>
       </Card>
@@ -322,6 +404,51 @@ const HomeScreen: React.FC = () => {
           style={styles.searchButton}
         />
       </View>
+      <View style={styles.actionsContainer}>
+        <Button
+          mode="outlined"
+          icon="clock-outline"
+          onPress={() => navigation.navigate('ServiciosPendientes')}
+          style={styles.pendientesButton}
+        >
+          Servicios Pendientes
+        </Button>
+      </View>
+
+      <View style={styles.filterContainer}>
+        <Button
+          mode={filtroEstado === 'todos' ? 'contained' : 'outlined'}
+          onPress={() => handleFiltroEstadoChange('todos')}
+          style={styles.filterButton}
+          compact
+        >
+          Todos
+        </Button>
+        <Button
+          mode={filtroEstado === 'pendiente' ? 'contained' : 'outlined'}
+          onPress={() => handleFiltroEstadoChange('pendiente')}
+          style={styles.filterButton}
+          compact
+        >
+          Pendientes
+        </Button>
+        <Button
+          mode={filtroEstado === 'completo' ? 'contained' : 'outlined'}
+          onPress={() => handleFiltroEstadoChange('completo')}
+          style={styles.filterButton}
+          compact
+        >
+          Completos
+        </Button>
+        <Button
+          mode={filtroEstado === 'enviado' ? 'contained' : 'outlined'}
+          onPress={() => handleFiltroEstadoChange('enviado')}
+          style={styles.filterButton}
+          compact
+        >
+          Enviados
+        </Button>
+      </View>
       
       {/* Mostrar mensaje cuando no hay resultados en la búsqueda */}
       {!loading && searchQuery.trim() !== '' && cambios.length === 0 ? (
@@ -332,6 +459,9 @@ const HomeScreen: React.FC = () => {
             No se encontraron cambios para "{searchQuery}"
           </Text>
         </View>
+        
+
+        
       ) : (
         <FlatList
           data={cambios}
@@ -496,6 +626,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
+
+  actionsContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+  pendientesButton: {
+      borderColor: colors.warning,
+      marginBottom: 8,
+    },
+        chipEstado: {
+      marginBottom: 4,
+      marginRight: 8,
+      },
+      chipPendiente: {
+        backgroundColor: colors.warning,
+      },
+      chipCompleto: {
+        backgroundColor: colors.success,
+      },
+      chipEnviado: {
+        backgroundColor: colors.info,
+      },
+      
+
+
+      // NUEVOS ESTILOS FALTANTES:
+  filterContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    justifyContent: 'space-around',
+  },
+  filterButton: {
+    flex: 1,
+    marginHorizontal: 2,
+  }
 });
 
 export default HomeScreen;
