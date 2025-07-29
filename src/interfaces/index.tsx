@@ -11,6 +11,11 @@ export type LubricentroStatus = 'active' | 'activo' | 'inactive' | 'trial' | 'su
 
 export type CambioEstado = 'pendiente' | 'completo' | 'enviado';
 
+export interface LoginFormValues {
+  email: string;
+  password: string;
+}
+
 // Usuario
 export interface User {
   id: string;

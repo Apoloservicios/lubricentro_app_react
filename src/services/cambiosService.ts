@@ -108,21 +108,89 @@ const getLubricentroInfo = async (lubricentroId: string) => {
 const convertFirestoreDataToCambio = async (doc: any): Promise<CambioAceite> => {
   const data = doc.data();
   
-  // Obtener información completa del lubricentro
+  // Obtener información del lubricentro
   const lubricentroInfo = await getLubricentroInfo(data.lubricentroId);
+  
+  // CORREGIR: Manejar createdAt problemático
+  let createdAtDate: Date;
+  
+  if (data.createdAt) {
+    // Si es un Timestamp de Firestore
+    if (data.createdAt.toDate && typeof data.createdAt.toDate === 'function') {
+      createdAtDate = data.createdAt.toDate();
+    }
+    // Si es un objeto con _methodName (serverTimestamp sin procesar)
+    else if (data.createdAt._methodName === 'serverTimestamp') {
+      // Usar fechaServicio como fallback para registros antiguos
+      createdAtDate = data.fechaServicio?.toDate ? data.fechaServicio.toDate() : new Date();
+    }
+    // Si es una fecha válida
+    else if (data.createdAt instanceof Date) {
+      createdAtDate = data.createdAt;
+    }
+    // Si es un string de fecha
+    else if (typeof data.createdAt === 'string') {
+      createdAtDate = new Date(data.createdAt);
+    }
+    // Fallback final
+    else {
+      createdAtDate = data.fechaServicio?.toDate ? data.fechaServicio.toDate() : new Date();
+    }
+  } else {
+    // Si no hay createdAt, usar fechaServicio
+    createdAtDate = data.fechaServicio?.toDate ? data.fechaServicio.toDate() : new Date();
+  }
   
   return {
     id: doc.id,
-    ...data,
-    // CORREGIR: Verificar si existe antes de convertir
-    fecha: data.fecha?.toDate ? data.fecha.toDate() : new Date(),
-    fechaServicio: data.fechaServicio?.toDate ? data.fechaServicio.toDate() : new Date(),
+    nroCambio: data.nroCambio || 'S/N',
+    nombreCliente: data.nombreCliente || '',
+    celular: data.celular || '',
+    dominioVehiculo: data.dominioVehiculo || '',
+    marcaVehiculo: data.marcaVehiculo || '',
+    modeloVehiculo: data.modeloVehiculo || '',
+    añoVehiculo: data.añoVehiculo || '',
+    tipoVehiculo: data.tipoVehiculo || '',
+    kmActuales: data.kmActuales || 0,
+    kmProximo: data.kmProximo || 0,
+    fecha: data.fecha?.toDate ? data.fecha.toDate() : createdAtDate,
+    fechaServicio: data.fechaServicio?.toDate ? data.fechaServicio.toDate() : createdAtDate,
     fechaProximoCambio: data.fechaProximoCambio?.toDate ? data.fechaProximoCambio.toDate() : new Date(),
-    createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+    perioricidad_servicio: data.perioricidad_servicio || 3,
+    tipoAceite: data.tipoAceite || '',
+    marcaAceite: data.marcaAceite || '',
+    sae: data.sae || '',
+    cantidadAceite: data.cantidadAceite || '',
+    filtroAceite: data.filtroAceite || false,
+    filtroAceiteNota: data.filtroAceiteNota || '',
+    filtroAire: data.filtroAire || false,
+    filtroAireNota: data.filtroAireNota || '',
+    filtroCombustible: data.filtroCombustible || false,
+    filtroCombustibleNota: data.filtroCombustibleNota || '',
+    filtroHabitaculo: data.filtroHabitaculo || false,
+    filtroHabitaculoNota: data.filtroHabitaculoNota || '',
+    aditivo: data.aditivo || false,
+    aditivoNota: data.aditivoNota || '',
+    engrase: data.engrase || false,
+    engraseNota: data.engraseNota || '',
+    refrigerante: data.refrigerante || false,
+    refrigeranteNota: data.refrigeranteNota || '',
+    caja: data.caja || false,
+    cajaNota: data.cajaNota || '',
+    diferencial: data.diferencial || false,
+    diferencialNota: data.diferencialNota || '',
+    observaciones: data.observaciones || '',
+    lubricentroId: data.lubricentroId || '',
+    lubricentroNombre: data.lubricentroNombre || '',
+    operatorId: data.operatorId || '',
+    nombreOperario: data.nombreOperario || '',
     
-    // NUEVO: Manejar estado - si no existe, asumir 'completo' para cambios antiguos
+    // USAR LA FECHA CORREGIDA
+    createdAt: createdAtDate,
+    
+    // Manejar estado
     estado: data.estado || 'completo',
-    fechaCreacion: data.fechaCreacion?.toDate ? data.fechaCreacion.toDate() : data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+    fechaCreacion: data.fechaCreacion?.toDate ? data.fechaCreacion.toDate() : createdAtDate,
     fechaCompletado: data.fechaCompletado?.toDate ? data.fechaCompletado.toDate() : undefined,
     usuarioCompletado: data.usuarioCompletado || data.operatorId,
     
@@ -191,21 +259,22 @@ export const marcarComoEnviado = async (cambioId: string): Promise<void> => {
 };
 
 // Función para obtener todos los cambios de un lubricentro - ACTUALIZADA
-export const getCambios = async (lubricentroId: string, limitCount = 20): Promise<CambioAceite[]> => {
+export const getCambios = async (lubricentroId: string, limitCount = 50): Promise<CambioAceite[]> => {
   try {
     const q = query(
       collection(db, CAMBIOS_COLLECTION),
       where('lubricentroId', '==', lubricentroId),
-      orderBy('createdAt', 'desc'),
+      orderBy('createdAt', 'desc'), // ✅ Esto funcionará perfecto con registros nuevos
       limit(limitCount)
     );
     
     const querySnapshot = await getDocs(q);
     
-    // Procesar todos los documentos y obtener información del lubricentro
+    // Procesar documentos
     const cambiosPromises = querySnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
+    const cambios = await Promise.all(cambiosPromises);
     
-    return await Promise.all(cambiosPromises);
+    return cambios; // Ya vienen ordenados de Firebase
   } catch (error) {
     console.error('Error al obtener cambios:', error);
     throw error;

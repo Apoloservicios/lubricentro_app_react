@@ -34,7 +34,18 @@ import 'moment/locale/es';
 moment.locale('es');
 
 type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'Home'>;
-
+// Función auxiliar para ordenar cambios
+const ordenarCambios = (cambios: CambioAceite[]) => {
+  return cambios.sort((a, b) => {
+    const dateA = a.createdAt || a.fecha || a.fechaServicio;
+    const dateB = b.createdAt || b.fecha || b.fechaServicio;
+    
+    const timestampA = moment(dateA).valueOf();
+    const timestampB = moment(dateB).valueOf();
+    
+    return timestampB - timestampA; // Más reciente primero
+  });
+};
 
 
 
@@ -51,16 +62,33 @@ const HomeScreen: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completo' | 'enviado'>('todos');
 
   // Cargar cambios de aceite
+// Cargar cambios de aceite ORDENADOS
+// En HomeScreen.tsx, agrega este debug temporal en loadCambios:
+
 const loadCambios = useCallback(async () => {
   if (!authState.lubricentro) return;
   
   try {
     setLoading(true);
     const results = await getCambios(authState.lubricentro.id);
+    
+    // DEBUG: Verificar las fechas de los primeros 3 cambios
+    console.log('=== DEBUG CAMBIOS ===');
+    results.slice(0, 3).forEach((cambio, index) => {
+      console.log(`Cambio ${index + 1}:`);
+      console.log(`  ID: ${cambio.id}`);
+      console.log(`  Número: ${cambio.nroCambio}`);
+      console.log(`  CreatedAt: ${cambio.createdAt}`);
+      console.log(`  FechaServicio: ${cambio.fechaServicio}`);
+      console.log(`  Cliente: ${cambio.nombreCliente}`);
+      console.log('---');
+    });
+    console.log('=== FIN DEBUG ===');
+    
     setCambios(results);
     setAllCambios(results);
     
-    // NUEVO: Resetear filtros al cargar
+    // Resetear filtros al cargar
     setFiltroEstado('todos');
     setSearchQuery('');
   } catch (error) {
