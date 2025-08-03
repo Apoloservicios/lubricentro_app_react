@@ -36,8 +36,15 @@ import {
   formatDate,
   calculateNextChangeDate,
   calculateNextKm,
-  normalizeDominio
+  normalizeDominio,
+    toUpperCase,        // ✅ NUEVA - para mayúsculas automáticas
+  extractNumbers,     // ✅ NUEVA - para extraer números
+  formatLitros       // ✅ NUEVA - para formatear litros
 } from '../../utils/helpers';
+
+
+
+
 import moment from 'moment';
 import 'moment/locale/es';
 
@@ -76,7 +83,7 @@ const CambioForm: React.FC<CambioFormProps> = ({
     tipoAceite: 'Mineral',
     marcaAceite: 'YPF',
     sae: 'SAE 15W-40',
-    cantidadAceite: '4 Litros',
+    cantidadAceite: '4',
     filtroAceite: false,
     filtroAceiteNota: 'S/N', // Cambiado de 'Cambio S/N' a 'S/N'
     filtroAire: false,
@@ -308,11 +315,12 @@ const CambioForm: React.FC<CambioFormProps> = ({
                         <TextInput
                           label="Marca *"
                           value={values.marcaVehiculo}
-                          onChangeText={handleChange('marcaVehiculo')}
+                          onChangeText={(text) => setFieldValue('marcaVehiculo', toUpperCase(text))} // ✅ CAMBIO: Mayúsculas automáticas
                           onBlur={handleBlur('marcaVehiculo')}
                           error={touched.marcaVehiculo && !!errors.marcaVehiculo}
                           style={styles.input}
                           mode="outlined"
+                          autoCapitalize="characters" // ✅ CAMBIO: Forzar mayúsculas en el teclado
                           left={<TextInput.Icon icon="car-side" color={colors.primary} />}
                         />
                         {touched.marcaVehiculo && errors.marcaVehiculo && (
@@ -579,16 +587,22 @@ const CambioForm: React.FC<CambioFormProps> = ({
                       </View>
                       
                       <View style={styles.halfInput}>
-                        <TextInput
-                          label="Cantidad de Aceite *"
-                          value={values.cantidadAceite}
-                          onChangeText={handleChange('cantidadAceite')}
-                          onBlur={handleBlur('cantidadAceite')}
-                          error={touched.cantidadAceite && !!errors.cantidadAceite}
-                          style={styles.input}
-                          mode="outlined"
-                          left={<TextInput.Icon icon="water" color={colors.primary} />}
-                        />
+                           <TextInput
+                            label="Cantidad (solo números) *"
+                            value={extractNumbers(values.cantidadAceite)} // ✅ CAMBIO: Mostrar solo números
+                            onChangeText={(text) => {
+                              const numeros = extractNumbers(text);
+                              const cantidadFormateada = numeros ? formatLitros(numeros) : '';
+                              setFieldValue('cantidadAceite', cantidadFormateada);
+                            }} // ✅ CAMBIO: Formatear automáticamente
+                            onBlur={handleBlur('cantidadAceite')}
+                            error={touched.cantidadAceite && !!errors.cantidadAceite}
+                            keyboardType="numeric" // ✅ CAMBIO: Solo teclado numérico
+                            placeholder="Ej: 4"
+                            style={styles.input}
+                            mode="outlined"
+                            left={<TextInput.Icon icon="water" color={colors.primary} />}
+                          />
                         {touched.cantidadAceite && errors.cantidadAceite && (
                           <HelperText type="error">{errors.cantidadAceite}</HelperText>
                         )}

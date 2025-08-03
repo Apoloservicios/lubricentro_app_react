@@ -1,4 +1,4 @@
-// src/services/cambiosService.ts - CORREGIDO PARA INCLUIR INFORMACIÓN COMPLETA DEL LUBRICENTRO
+// src/services/cambiosService.ts - MEJORADO MANTENIENDO TODAS LAS FUNCIONALIDADES
 import { db } from '../config/firebase';
 import { 
   collection, 
@@ -104,7 +104,42 @@ const getLubricentroInfo = async (lubricentroId: string) => {
   }
 };
 
-// Función para convertir datos de Firestore a CambioAceite - ACTUALIZADA
+// NUEVA FUNCIÓN: Actualizar contadores del lubricentro
+const updateLubricentroCounters = async (lubricentroId: string) => {
+  try {
+    const lubricentroRef = doc(db, 'lubricentros', lubricentroId);
+    const lubricentroDoc = await getDoc(lubricentroRef);
+    
+    if (!lubricentroDoc.exists()) {
+      console.error('Lubricentro no encontrado para actualizar contadores');
+      return;
+    }
+    
+    const lubricentroData = lubricentroDoc.data() as Lubricentro;
+    
+    // Obtener contadores actuales o inicializar
+    const currentServicesUsed = lubricentroData.servicesUsed || 0;
+    const currentServicesRemaining = lubricentroData.servicesRemaining || 20;
+    
+    // Actualizar contadores
+    const newServicesUsed = currentServicesUsed + 1;
+    const newServicesRemaining = Math.max(0, currentServicesRemaining - 1);
+    
+    // Actualizar en Firebase
+    await updateDoc(lubricentroRef, {
+      servicesUsed: newServicesUsed,
+      servicesRemaining: newServicesRemaining,
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log(`Contadores actualizados - Usados: ${newServicesUsed}, Restantes: ${newServicesRemaining}`);
+    
+  } catch (error) {
+    console.error('Error al actualizar contadores del lubricentro:', error);
+  }
+};
+
+// Función para convertir datos de Firestore a CambioAceite - MANTENIENDO TODA LA LÓGICA ACTUAL
 const convertFirestoreDataToCambio = async (doc: any): Promise<CambioAceite> => {
   const data = doc.data();
   
@@ -199,25 +234,27 @@ const convertFirestoreDataToCambio = async (doc: any): Promise<CambioAceite> => 
   } as CambioAceite;
 };
 
-  export const getCambiosPendientes = async (lubricentroId: string): Promise<CambioAceite[]> => {
-    try {
-      const q = query(
-        collection(db, CAMBIOS_COLLECTION),
-        where('lubricentroId', '==', lubricentroId),
-        where('estado', '==', 'pendiente'),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const cambiosPromises = querySnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
-      
-      return await Promise.all(cambiosPromises);
-    } catch (error) {
-      console.error('Error al obtener cambios pendientes:', error);
-      throw error;
-    }
-  };
-  // Función para completar un servicio pendiente
+// Función para obtener cambios pendientes - MANTENIENDO FUNCIONALIDAD
+export const getCambiosPendientes = async (lubricentroId: string): Promise<CambioAceite[]> => {
+  try {
+    const q = query(
+      collection(db, CAMBIOS_COLLECTION),
+      where('lubricentroId', '==', lubricentroId),
+      where('estado', '==', 'pendiente'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const cambiosPromises = querySnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
+    
+    return await Promise.all(cambiosPromises);
+  } catch (error) {
+    console.error('Error al obtener cambios pendientes:', error);
+    throw error;
+  }
+};
+
+// Función para completar un servicio pendiente - MANTENIENDO FUNCIONALIDAD
 export const completarServicio = async (
   cambioId: string,
   formData: CambioAceiteFormValues,
@@ -244,7 +281,7 @@ export const completarServicio = async (
   }
 };
 
-// Función para marcar como enviado
+// Función para marcar como enviado - MANTENIENDO FUNCIONALIDAD
 export const marcarComoEnviado = async (cambioId: string): Promise<void> => {
   try {
     const docRef = doc(db, CAMBIOS_COLLECTION, cambioId);
@@ -258,13 +295,15 @@ export const marcarComoEnviado = async (cambioId: string): Promise<void> => {
   }
 };
 
-// Función para obtener todos los cambios de un lubricentro - ACTUALIZADA
+// FUNCIÓN CORREGIDA: Obtener todos los cambios con ordenamiento correcto
 export const getCambios = async (lubricentroId: string, limitCount = 50): Promise<CambioAceite[]> => {
   try {
+    // CAMBIO PRINCIPAL: Ordenar por fechaServicio en lugar de createdAt para compatibilidad
     const q = query(
       collection(db, CAMBIOS_COLLECTION),
       where('lubricentroId', '==', lubricentroId),
-      orderBy('createdAt', 'desc'), // ✅ Esto funcionará perfecto con registros nuevos
+      orderBy('fechaServicio', 'desc'), // ✅ CORRECCIÓN: Esto garantiza orden correcto
+      orderBy('createdAt', 'desc'),     // ✅ Segundo criterio para casos de misma fecha
       limit(limitCount)
     );
     
@@ -281,7 +320,7 @@ export const getCambios = async (lubricentroId: string, limitCount = 50): Promis
   }
 };
 
-// Función para buscar cambios por dominio o cliente - ACTUALIZADA
+// Función para buscar cambios por dominio o cliente - MANTENIENDO FUNCIONALIDAD
 export const searchCambios = async (
   lubricentroId: string, 
   searchTerm: string
@@ -329,7 +368,7 @@ export const searchCambios = async (
   }
 };
 
-// Función para obtener un cambio por ID - ACTUALIZADA
+// Función para obtener un cambio por ID - MANTENIENDO FUNCIONALIDAD
 export const getCambioById = async (cambioId: string): Promise<CambioAceite | null> => {
   try {
     const docRef = doc(db, CAMBIOS_COLLECTION, cambioId);
@@ -347,7 +386,7 @@ export const getCambioById = async (cambioId: string): Promise<CambioAceite | nu
   }
 };
 
-// Función para crear un cambio - ACTUALIZADA para incluir información del lubricentro
+// FUNCIÓN MEJORADA: Crear cambio con actualización de contadores
 export const createCambio = async (
   formData: CambioAceiteFormValues & {
     nroCambio: string;
@@ -391,6 +430,9 @@ export const createCambio = async (
     // Agregar el documento a Firestore
     const docRef = await addDoc(collection(db, CAMBIOS_COLLECTION), cambioToSave);
     
+    // NUEVA FUNCIONALIDAD: Actualizar contadores del lubricentro
+    await updateLubricentroCounters(lubricentro.id);
+    
     return docRef.id;
   } catch (error) {
     console.error('Error al crear cambio:', error);
@@ -398,7 +440,7 @@ export const createCambio = async (
   }
 };
 
-// Función para actualizar un cambio
+// Función para actualizar un cambio - MANTENIENDO FUNCIONALIDAD
 export const updateCambio = async (
   cambioId: string,
   data: CambioAceiteFormValues
@@ -430,7 +472,7 @@ export const updateCambio = async (
   }
 };
 
-// Función para eliminar un cambio
+// Función para eliminar un cambio - MANTENIENDO FUNCIONALIDAD
 export const deleteCambio = async (cambioId: string): Promise<void> => {
   try {
     const docRef = doc(db, CAMBIOS_COLLECTION, cambioId);

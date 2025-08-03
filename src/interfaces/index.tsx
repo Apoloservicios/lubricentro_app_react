@@ -47,6 +47,8 @@ export interface Lubricentro {
   trialEndDate?: Date;
   createdAt: Date;
   updatedAt: Date;
+    servicesUsed?: number;        // NUEVA - Para contar servicios utilizados
+  servicesRemaining?: number;   // NUEVA - Para contar servicios restantes
 }
 
 // Cambio de aceite - ACTUALIZADA para incluir información completa del lubricentro
