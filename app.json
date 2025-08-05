@@ -30,7 +30,8 @@
       ],
       "blockedPermissions": [
         "DETECT_SCREEN_CAPTURE",
-        "SYSTEM_ALERT_WINDOW"
+        "SYSTEM_ALERT_WINDOW",
+        "android.permission.DETECT_SCREEN_CAPTURE"
       ]
     },
     "web": {

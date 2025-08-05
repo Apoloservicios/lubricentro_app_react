@@ -269,10 +269,23 @@ export const completarServicio = async (
       fechaCompletado: serverTimestamp(),
       usuarioCompletado: currentUser.id,
       
-      // Convertir fechas a Timestamp
-      fechaServicio: formData.fechaServicio ? Timestamp.fromDate(formData.fechaServicio) : Timestamp.fromDate(new Date()),
-      fechaProximoCambio: formData.fechaProximoCambio ? Timestamp.fromDate(formData.fechaProximoCambio) : Timestamp.fromDate(new Date()),
+      // ✅ CORRECCIÓN: NO actualizar fechaServicio automáticamente
+      // Solo actualizar si viene en formData, sino mantener la original
+      fechaServicio: formData.fechaServicio ? 
+        Timestamp.fromDate(formData.fechaServicio) : 
+        undefined, // No sobrescribir si no se proporciona
+        
+      fechaProximoCambio: formData.fechaProximoCambio ? 
+        Timestamp.fromDate(formData.fechaProximoCambio) : 
+        undefined, // No sobrescribir si no se proporciona
     };
+    
+    // Remover campos undefined para no sobrescribir valores existentes
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
     
     await updateDoc(docRef, updateData);
   } catch (error) {
@@ -298,12 +311,11 @@ export const marcarComoEnviado = async (cambioId: string): Promise<void> => {
 // FUNCIÓN CORREGIDA: Obtener todos los cambios con ordenamiento correcto
 export const getCambios = async (lubricentroId: string, limitCount = 50): Promise<CambioAceite[]> => {
   try {
-    // CAMBIO PRINCIPAL: Ordenar por fechaServicio en lugar de createdAt para compatibilidad
+    // CORRECCIÓN: Ordenar por nroCambio en lugar de fechaServicio
     const q = query(
       collection(db, CAMBIOS_COLLECTION),
       where('lubricentroId', '==', lubricentroId),
-      orderBy('fechaServicio', 'desc'), // ✅ CORRECCIÓN: Esto garantiza orden correcto
-      orderBy('createdAt', 'desc'),     // ✅ Segundo criterio para casos de misma fecha
+      orderBy('nroCambio', 'desc'), // ✅ CORRECCIÓN: Ordenar por número de cambio descendente
       limit(limitCount)
     );
     
@@ -313,10 +325,33 @@ export const getCambios = async (lubricentroId: string, limitCount = 50): Promis
     const cambiosPromises = querySnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
     const cambios = await Promise.all(cambiosPromises);
     
-    return cambios; // Ya vienen ordenados de Firebase
+    return cambios;
   } catch (error) {
     console.error('Error al obtener cambios:', error);
-    throw error;
+    // Fallback si no hay índice para nroCambio
+    try {
+      console.log('Intentando consulta sin orderBy...');
+      const fallbackQuery = query(
+        collection(db, CAMBIOS_COLLECTION),
+        where('lubricentroId', '==', lubricentroId),
+        limit(limitCount)
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      const cambiosPromises = fallbackSnapshot.docs.map(doc => convertFirestoreDataToCambio(doc));
+      const cambios = await Promise.all(cambiosPromises);
+      
+      // Ordenar por nroCambio en código JavaScript
+      return cambios.sort((a, b) => {
+        // Extraer números de los códigos (ej: "AP-00083" -> 83)
+        const numA = parseInt(a.nroCambio.split('-')[1] || '0');
+        const numB = parseInt(b.nroCambio.split('-')[1] || '0');
+        return numB - numA; // Descendente (más reciente primero)
+      });
+    } catch (fallbackError) {
+      console.error('Error en consulta fallback:', fallbackError);
+      throw fallbackError;
+    }
   }
 };
 

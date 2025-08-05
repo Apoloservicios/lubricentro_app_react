@@ -7,7 +7,8 @@ export type UserRole = 'admin' | 'operator' | 'viewer';
 export type UserStatus = 'activo' | 'inactivo' | 'suspendido';
 
 // Estado del lubricentro
-export type LubricentroStatus = 'active' | 'activo' | 'inactive' | 'trial' | 'suspended';
+
+export type LubricentroStatus = 'active' | 'activo' | 'inactive' | 'inactivo' | 'trial' | 'suspended';
 
 export type CambioEstado = 'pendiente' | 'completo' | 'enviado';
 

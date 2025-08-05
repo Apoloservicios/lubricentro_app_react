@@ -10,6 +10,8 @@ import {
   Platform,
   Linking
 } from 'react-native';
+
+
 import { 
   Text, 
   Card, 
@@ -134,61 +136,100 @@ const CambioDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       );
     };
   // Generar y compartir PDF - CORREGIDO usando expo-print
-  const generateAndSharePdf = async () => {
-    if (!cambio) return;
+ const generateAndSharePdf = async () => {
+  if (!cambio) return;
+  
+  try {
+    setGeneratingPdf(true);
     
-    try {
-      setGeneratingPdf(true);
-      
-      // Generar HTML para el PDF
-      const html = generatePdfHtml(cambio);
-      
-      // Crear PDF usando expo-print
-      const { uri } = await Print.printToFileAsync({
-        html,
-        base64: false,
-        margins: {
-          left: 20,
-          top: 20,
-          right: 20,
-          bottom: 20,
+    // Generar HTML para el PDF usando la función del utils
+    const html = generatePdfHtml(cambio);
+    
+    // Crear PDF usando expo-print
+    const { uri } = await Print.printToFileAsync({
+      html,
+      base64: false,
+      margins: {
+        left: 20,
+        top: 20,
+        right: 20,
+        bottom: 20,
+      },
+    });
+    
+    // Compartir directamente el PDF temporal
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `Compartir Cambio de Aceite ${cambio.nroCambio}`,
+    });
+    
+  } catch (error) {
+    console.error('Error al generar o compartir PDF:', error);
+    Alert.alert(
+      'Error al generar PDF', 
+      'No se pudo generar el PDF. ¿Desea compartir la información como texto?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
         },
-      });
-      
-      // Mover el archivo a una ubicación permanente
-      const fileName = `Cambio_${cambio.nroCambio.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      const newPath = FileSystem.documentDirectory + fileName;
-      
-      await FileSystem.moveAsync({
-        from: uri,
-        to: newPath,
-      });
-      
-      // Compartir el PDF
-      await Sharing.shareAsync(newPath, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Compartir ${cambio.nroCambio}`,
-      });
-      
-    } catch (error) {
-      console.error('Error al generar o compartir PDF:', error);
-      Alert.alert('Error', 'No se pudo generar el PDF');
-      
-      // Fallback: compartir información como texto
-      const shareMessage = `📄 Comprobante de Cambio de Aceite\n\n${cambio.nroCambio}\n\nCliente: ${cambio.nombreCliente}\nVehículo: ${cambio.marcaVehiculo} ${cambio.modeloVehiculo}\nDominio: ${cambio.dominioVehiculo}\nFecha: ${moment(cambio.fechaServicio).format('DD/MM/YYYY')}`;
-      
-      try {
-        await Share.share({
-          message: shareMessage,
-          title: `Cambio de aceite ${cambio.nroCambio}`,
-        });
-      } catch (shareError) {
-        console.error('Error al compartir:', shareError);
-      }
-    } finally {
-      setGeneratingPdf(false);
-    }
-  };
+        {
+          text: 'Compartir como texto',
+          onPress: () => shareAsText(),
+        },
+      ]
+    );
+  } finally {
+    setGeneratingPdf(false);
+  }
+};
+
+// ✅ AGREGAR ESTA NUEVA FUNCIÓN AL COMPONENTE:
+const shareAsText = async () => {
+  if (!cambio) return;
+  
+  const fechaServicio = moment(cambio.fechaServicio).format('DD/MM/YYYY');
+  const fechaProximo = moment(cambio.fechaProximoCambio).format('DD/MM/YYYY');
+  
+  const shareMessage = `
+🛢️ COMPROBANTE DE CAMBIO DE ACEITE
+N° ${cambio.nroCambio}
+
+👤 CLIENTE
+${cambio.nombreCliente}
+📞 ${cambio.celular}
+
+🚗 VEHÍCULO
+${cambio.marcaVehiculo} ${cambio.modeloVehiculo} (${cambio.añoVehiculo})
+🔢 Dominio: ${cambio.dominioVehiculo}
+📊 Tipo: ${cambio.tipoVehiculo}
+
+⛽ SERVICIO
+📅 Fecha: ${fechaServicio}
+🛣️ Km actuales: ${cambio.kmActuales.toLocaleString()}
+🎯 Próximo cambio: ${cambio.kmProximo.toLocaleString()} km
+📆 Próxima fecha: ${fechaProximo}
+
+🛢️ ACEITE
+Tipo: ${cambio.tipoAceite}
+Marca: ${cambio.marcaAceite}
+SAE: ${cambio.sae}
+Cantidad: ${cambio.cantidadAceite}
+
+🏪 ${cambio.lubricentroNombre}
+${cambio.lubricentro?.phone ? `📞 ${cambio.lubricentro.phone}` : ''}
+  `.trim();
+  
+  try {
+    await Share.share({
+      message: shareMessage,
+      title: `Cambio de Aceite ${cambio.nroCambio}`,
+    });
+  } catch (error) {
+    console.error('Error al compartir texto:', error);
+    Alert.alert('Error', 'No se pudo compartir la información');
+  }
+};
   
   // Compartir mensaje por WhatsApp - MENSAJE MUY AMPLIADO
 // Compartir mensaje por WhatsApp - MENSAJE AMPLIADO CON INFORMACIÓN REAL DEL LUBRICENTRO

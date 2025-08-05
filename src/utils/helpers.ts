@@ -2,8 +2,14 @@
 import moment from 'moment';
 
 // Funciones de validación existentes (MANTENIDAS)
+// ✅ FUNCIÓN CORREGIDA: Validación de teléfono más flexible
 export const isValidPhoneNumber = (phone: string): boolean => {
-  return /^[+]?[0-9]{4,6}$/im.test(phone);
+  // Eliminar espacios, guiones y paréntesis
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  
+  // Permitir números de 7 a 15 dígitos (puede empezar con +)
+  // Ejemplos válidos: +5492604515854, 2604515854, 260-451-5854, (260) 451-5854
+  return /^[+]?[0-9]{7,15}$/i.test(cleanPhone);
 };
 
 export const isValidDominio = (dominio: string): boolean => {
@@ -24,6 +30,25 @@ export const capitalizeWords = (text: string): string => {
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+};
+
+// ✅ NUEVA FUNCIÓN: Formatear teléfono para mostrar
+export const formatPhoneNumber = (phone: string): string => {
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  
+  // Si es un número argentino (empieza con +549 o 549 o 11 dígitos)
+  if (cleanPhone.startsWith('+549') && cleanPhone.length === 13) {
+    // +5492604515854 -> +549 260 451-5854
+    return `${cleanPhone.slice(0, 4)} ${cleanPhone.slice(4, 7)} ${cleanPhone.slice(7, 10)}-${cleanPhone.slice(10)}`;
+  } else if (cleanPhone.startsWith('549') && cleanPhone.length === 12) {
+    // 5492604515854 -> 549 260 451-5854
+    return `${cleanPhone.slice(0, 3)} ${cleanPhone.slice(3, 6)} ${cleanPhone.slice(6, 9)}-${cleanPhone.slice(9)}`;
+  } else if (cleanPhone.length === 10) {
+    // 2604515854 -> 260 451-5854
+    return `${cleanPhone.slice(0, 3)} ${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}`;
+  }
+  
+  return phone; // Devolver el original si no coincide con los patrones
 };
 
 // NUEVAS FUNCIONES AGREGADAS:
@@ -50,11 +75,13 @@ export const formatLitros = (cantidad: string): string => {
 
 // Constantes para los tipos de vehículos (MANTENIDAS)
 export const vehicleTypes = [
-  { label: 'Auto', value: 'Auto' },
+  { label: 'Automovil', value: 'Automovil' },
+  { label: 'Suv', value: 'Suv' },
+    { label: 'Utilitario', value: 'Utilitario' },
   { label: 'Camioneta', value: 'Camioneta' },
   { label: 'Camión', value: 'Camión' },
   { label: 'Moto', value: 'Moto' },
-  { label: 'Tractor', value: 'Tractor' },
+  
   { label: 'Maquinaria', value: 'Maquinaria' },
   { label: 'Otro', value: 'Otro' },
 ];
@@ -69,13 +96,25 @@ export const oilTypes = [
 
 // Constantes para las viscosidades SAE (MANTENIDAS)
 export const saeOptions = [
-  { label: 'SAE 10W-30', value: 'SAE 10W-30' },
-  { label: 'SAE 10W-40', value: 'SAE 10W-40' },
+  { label: 'SAE 0W-20', value: 'SAE 0W-20' },
+  { label: 'SAE 0W-30', value: 'SAE 0W-30' },
+  { label: 'SAE 0W-40', value: 'SAE 0W-40' },
+   { label: 'SAE 5W-20', value: 'SAE 5W-20' },
   { label: 'SAE 5W-30', value: 'SAE 5W-30' },
   { label: 'SAE 5W-40', value: 'SAE 5W-40' },
+   { label: 'SAE 5W-50', value: 'SAE 5W-50' },
+
+
+  { label: 'SAE 10W-30', value: 'SAE 10W-30' },
+  { label: 'SAE 10W-40', value: 'SAE 10W-40' },
+   { label: 'SAE 10W-50', value: 'SAE 10W-50' },
+    { label: 'SAE 10W-60', value: 'SAE 10W-60' },
+
   { label: 'SAE 15W-40', value: 'SAE 15W-40' },
   { label: 'SAE 20W-50', value: 'SAE 20W-50' },
   { label: 'SAE 25W-60', value: 'SAE 25W-60' },
+  
+  { label: 'SAE 20', value: 'SAE 20' },
   { label: 'SAE 30', value: 'SAE 30' },
   { label: 'SAE 40', value: 'SAE 40' },
   { label: 'SAE 50', value: 'SAE 50' },
@@ -85,6 +124,8 @@ export const saeOptions = [
   { label: 'SAE 85W-140', value: 'SAE 85W-140' },
   { label: 'Otro', value: 'Otro' },
 ];
+
+
 
 // Constantes para las marcas de aceite comunes (MANTENIDAS)
 export const oilBrands = [
